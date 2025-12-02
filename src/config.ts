@@ -21,10 +21,11 @@ export const CONFIG = {
     PRIVATE_KEY: process.env.PRIVATE_KEY || '', // Opzionale per ora (solo listener)
 
     // Costanti Raydium & Solana
-    RAYDIUM_PROGRAM_ID: '675kPX9M1MnewR41nXsTN5ZJ3yQk64fA7fRkE7F5d2',
+    RAYDIUM_PROGRAM_ID: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', // Raydium V4 AMM (Legacy)
+    OPENBOOK_PROGRAM_ID: 'opnb2LAfJYbRMAHHvqjCwQxanZn7ReEHp1k81EohpZb', // OpenBook v1 (ex-Serum fork)
     POOL_SIZE_BYTES: 752, // Dimensione fissa struct AMM V4
     SOL_MINT: 'So11111111111111111111111111111111111111112',
 
     // Impostazioni Bot
-    COMMITMENT_LEVEL: 'processed' // 'processed' = velocità massima
+    COMMITMENT_LEVEL: 'confirmed' // 'processed' = velocità massima
 };

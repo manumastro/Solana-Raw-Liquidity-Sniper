@@ -1,0 +1,18 @@
+Soluzione 3: La "OpenBook Strategy" (La vera soluzione da Sniper) 🧠
+Questa è la tecnica usata dai bot avanzati per anticipare tutti.
+
+Il Concetto: Per creare una Pool su Raydium, uno sviluppatore deve PRIMA creare un "Mercato" su OpenBook (il DEX orderbook di Solana). Questo avviene in una transazione separata, spesso pochi secondi/minuti prima della creazione della Pool Raydium.
+
+Il Trucco: Invece di ascoltare Raydium (che è bloccato), ascolti OpenBook.
+
+Ascolto: Ti iscrivi a programSubscribe per il Program ID di OpenBook (srmqPvymJe8xpQ56i6och1UsJNwd6PvDnVrINGM7). Questo solitamente NON è bloccato sui free tier perché ha meno traffico.
+
+Rilevamento: Appena vedi un nuovo Mercato OpenBook, leggi i dati (BaseMint = Token, QuoteMint = SOL). Hai l'indirizzo del token PRIMA ancora che la pool Raydium esista.
+
+Predizione (PDA): L'indirizzo della futura pool Raydium è "deterministico". Significa che puoi calcolarlo matematicamente a priori combinando Raydium Program ID + OpenBook Market ID.
+
+Execution:
+
+Opzione A: Inizi a spammare tentativi di acquisto su quell'indirizzo previsto finché la pool non apre.
+
+Opzione B (Più pulita): Fai una accountSubscribe su quello specifico indirizzo di pool previsto. Helius Free permette di ascoltare un singolo account specifico. Appena l'account si "accende" (viene inizializzato), compri nello stesso millisecondo.

@@ -26,60 +26,77 @@ export async function startRawListener() {
         const ws = new WebSocket(CONFIG.HELIUS_WSS);
 
         ws.on('open', () => {
-            console.log("✅ Connesso al flusso dati Raw Memory di Helius.");
-            console.log(`   --> Filtro Raydium ID: ${CONFIG.RAYDIUM_PROGRAM_ID}`);
-            console.log(`   --> Filtro Dimensione: ${CONFIG.POOL_SIZE_BYTES} bytes`);
+            console.log("✅ Connesso al flusso dati Helius.");
+            console.log(`   --> Modalità: LOGS (Fallback per limitazioni RPC)`);
+            console.log(`   --> Target: Raydium V4 (${CONFIG.RAYDIUM_PROGRAM_ID})`);
 
-            // Invia comando di sottoscrizione
-            ws.send(JSON.stringify(subscribeRequest));
+            // Usiamo logsSubscribe perché programSubscribe è bloccato su Helius Free/Public per Raydium
+            // NOTA: Validazione e uso del Raydium Program ID
+            try {
+                // Validiamo che sia un PublicKey valido
+                const raydiumPubkey = new PublicKey(CONFIG.RAYDIUM_PROGRAM_ID);
+                console.log(`✅ Raydium PublicKey validato: ${raydiumPubkey.toBase58()}`);
+
+                const request = {
+                    jsonrpc: "2.0",
+                    id: 1,
+                    method: "logsSubscribe",
+                    params: [
+                        { mentions: [raydiumPubkey.toBase58()] },
+                        { commitment: CONFIG.COMMITMENT_LEVEL }
+                    ]
+                };
+
+                ws.send(JSON.stringify(request));
+            } catch (err) {
+                console.error("❌ Errore validazione PublicKey:", err);
+                reject(err);
+            }
         });
 
-        ws.on('message', (data: string) => {
+
+        // Contatore per modalità TEST
+        let txCounter = 0;
+
+        ws.on('message', async (data: string) => {
             try {
                 const response = JSON.parse(data);
 
-                // Ignora messaggi di sistema (es. conferma sottoscrizione id:1)
+                // Log solo la conferma di sottoscrizione
+                if (response.result && response.id === 1) {
+                    console.log(`✅ Sottoscrizione attiva (ID: ${response.result})`);
+                    console.log(`🎯 In ascolto per nuove pool Raydium...`);
+                    console.log(`📊 Modalità TEST: Mostrerò sample ogni 10 TX\n`);
+                    return;
+                }
+
+                // Ignora messaggi di sistema
                 if (!response.params || !response.params.result || !response.params.result.value) {
                     return;
                 }
 
                 const value = response.params.result.value;
-                const pubkeyStr = value.pubkey; // Pool ID
-                const accountData = value.account.data; // [base64_string, encoding]
+                const logs = value.logs as string[];
+                const signature = value.signature;
 
-                if (accountData[1] === 'base64') {
-                    // DECODIFICA LOCALE (Zero Latency)
-                    const buffer = Buffer.from(accountData[0], 'base64');
+                // Incrementa contatore
+                txCounter++;
 
-                    // Parsing Raw Memory (Layout Raydium V4)
-                    const lpMint = new PublicKey(buffer.subarray(328, 360));
-                    const coinMint = new PublicKey(buffer.subarray(400, 432));
-                    const pcMint = new PublicKey(buffer.subarray(432, 464));
+                // Cerca l'istruzione di creazione pool (Initialize2)
+                const isNewPool = logs.some(log => log.includes("Initialize2"));
 
-                    // Logica di Identificazione Target
-                    let snipeToken = '';
-                    let pairType = '';
+                if (isNewPool) {
+                    console.log(`\n🎉 NUOVA POOL RILEVATA!`);
+                    console.log(`   TX: https://solscan.io/tx/${signature}`);
+                    console.log(`   ⏱️  Tempo: ${new Date().toISOString()}`);
+                    console.log(`   📋 Logs:`, logs.filter(l => l.includes("Initialize2") || l.includes("Program log")));
 
-                    if (coinMint.toBase58() === CONFIG.SOL_MINT) {
-                        snipeToken = pcMint.toBase58();
-                        pairType = 'SOL / TOKEN';
-                    } else if (pcMint.toBase58() === CONFIG.SOL_MINT) {
-                        snipeToken = coinMint.toBase58();
-                        pairType = 'TOKEN / SOL';
-                    } else {
-                        // Ignora coppie non-SOL
-                        return;
-                    }
-
-                    console.log(`\n🎯 NUOVA POOL IDENTIFICATA!`);
-                    console.log(`   ID Pool: ${pubkeyStr}`);
-                    console.log(`   Token:   ${snipeToken}`);
-                    console.log(`   Coppia:  ${pairType}`);
-                    console.log(`   LP Mint: ${lpMint.toBase58()}`);
-                    console.log(`   ⏱️  Tempo:   ${new Date().toISOString()}`);
-
-                    // TODO: Qui chiameremo l'Executor in futuro
-                    // await executor.buy(snipeToken, ...);
+                    // TODO: Qui dovremmo fare getTransaction per avere i dettagli (Token A, Token B)
+                    // Poiché non abbiamo i dati raw in memoria, dobbiamo fare una fetch.
+                    // Questo è più lento del raw memory ma funziona su tutti gli RPC.
+                } else if (txCounter % 10 === 0) {
+                    // Ogni 10 TX, mostra un sample per confermare che stiamo ricevendo dati
+                    console.log(`📊 [${txCounter} TX ricevute] Sample: ${signature.substring(0, 16)}...`);
                 }
 
             } catch (err) {
@@ -93,7 +110,7 @@ export async function startRawListener() {
         });
 
         ws.on('close', () => {
-            console.log("⚠️ Connessione chiusa dal server. Riconnessione tra 2s...");
+            console.log("⚠️ Connessione chiusa. Riconnessione...");
             setTimeout(() => startRawListener(), 2000);
         });
     });
