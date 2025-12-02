@@ -4,6 +4,7 @@ import { PublicKey } from '@solana/web3.js';
 import { CONFIG } from '../config';
 import { parseMarketData } from '../parsers/market_parser';
 import { PdaCalculator } from '../utils/pda_calculator';
+import { SniperManager } from '../core/sniper_manager';
 
 /**
  * 🧠 OPENBOOK STRATEGY - La strategia avanzata degli sniper professionisti
@@ -77,7 +78,7 @@ export async function startOpenBookListener() {
 
                 const accountInfo = response.params.result.value;
                 const slot = response.params.result.context.slot;
-                console.log(accountInfo);
+                // console.log(accountInfo); // Rimosso per pulizia output
 
                 // Nuovo account OpenBook rilevato!
                 if (accountInfo && accountInfo.account) {
@@ -113,6 +114,15 @@ export async function startOpenBookListener() {
                             // 1. Calcolo ATA (Dove riceveremo i token)
                             const baseAta = PdaCalculator.getAssociatedTokenAccount(dummyWallet, new PublicKey(marketData.baseMint));
                             console.log(`   🏦 Predicted ATA (Base): ${baseAta.toBase58()}`);
+
+                            // AGGIUNTA ALLA WATCHLIST
+                            SniperManager.getInstance().addToWatchlist({
+                                marketId: pubkey,
+                                baseMint: marketData.baseMint,
+                                quoteMint: marketData.quoteMint,
+                                baseAta: baseAta.toBase58(),
+                                timestamp: Date.now()
+                            });
 
                             // 2. Tentativo Predizione Pool (Solo per scopi futuri/CPMM)
                             // NOTA: Per Raydium V4 Legacy (il nostro target attuale), l'indirizzo pool è random (Keypair).
