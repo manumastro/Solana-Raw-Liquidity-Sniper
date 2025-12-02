@@ -2,6 +2,8 @@
 import WebSocket from 'ws';
 import { PublicKey } from '@solana/web3.js';
 import { CONFIG } from '../config';
+import { parseMarketData } from '../parsers/market_parser';
+import { PdaCalculator } from '../utils/pda_calculator';
 
 /**
  * 🧠 OPENBOOK STRATEGY - La strategia avanzata degli sniper professionisti
@@ -43,7 +45,7 @@ export async function startOpenBookListener() {
                             filters: [
                                 // Filtro per dimensione tipica di un Market account OpenBook
                                 // Un Market OpenBook V3 è circa 388 bytes
-                                { dataSize: 388 }
+                                // { dataSize: 388 }  <-- RIMOSSO TEMPORANEAMENTE PER DEBUG
                             ]
                         }
                     ]
@@ -75,24 +77,55 @@ export async function startOpenBookListener() {
 
                 const accountInfo = response.params.result.value;
                 const slot = response.params.result.context.slot;
+                console.log(accountInfo);
 
                 // Nuovo account OpenBook rilevato!
                 if (accountInfo && accountInfo.account) {
                     const pubkey = accountInfo.pubkey;
-                    const data = accountInfo.account.data;
+                    const dataBuffer = Buffer.from(accountInfo.account.data[0], 'base64');
 
-                    console.log(`\n🔥 NUOVO MERCATO OPENBOOK RILEVATO!`);
-                    console.log(`   📍 Market Address: ${pubkey}`);
-                    console.log(`   🎰 Slot: ${slot}`);
-                    console.log(`   ⏱️  Tempo: ${new Date().toISOString()}`);
-                    console.log(`   🔗 Solscan: https://solscan.io/account/${pubkey}`);
+                    // Decodifica immediata dei dati
+                    const marketData = parseMarketData(dataBuffer);
 
-                    // TODO: Decodificare i dati del mercato per estrarre:
-                    // - baseMint (il token nuovo)
-                    // - quoteMint (solitamente SOL o USDC)
-                    // - Calcolare l'indirizzo PDA della futura pool Raydium
+                    // SMART FILTER: Ignora account che non sono mercati validi
+                    // Un mercato valido deve avere Mint diversi dal System Program (111111...)
+                    const SYSTEM_PROGRAM = '11111111111111111111111111111111';
 
-                    console.log(`   ⚠️  TODO: Decodifica market data + calcolo PDA pool Raydium\n`);
+                    if (marketData &&
+                        marketData.baseMint !== SYSTEM_PROGRAM &&
+                        marketData.quoteMint !== SYSTEM_PROGRAM) {
+
+                        console.log(`\n🔥 NUOVO MERCATO OPENBOOK RILEVATO!`);
+                        console.log(`   📍 Market Address: ${pubkey}`);
+                        console.log(`   🎰 Slot: ${slot}`);
+                        console.log(`   ⏱️  Tempo: ${new Date().toISOString()}`);
+                        console.log(`   💎 Base Mint (Token): ${marketData.baseMint}`);
+                        console.log(`   💰 Quote Mint (SOL/USDC): ${marketData.quoteMint}`);
+                        console.log(`   🔗 Solscan: https://solscan.io/account/${pubkey}`);
+
+                        // Tentativo di predizione (spesso fallisce per V4, ma utile per debug)
+                        // TODO: Sostituire con il vero wallet dell'utente quando avremo il modulo Wallet
+                        const dummyWallet = new PublicKey('11111111111111111111111111111111');
+
+                        try {
+                            const raydiumProgId = new PublicKey(CONFIG.RAYDIUM_PROGRAM_ID);
+
+                            // 1. Calcolo ATA (Dove riceveremo i token)
+                            const baseAta = PdaCalculator.getAssociatedTokenAccount(dummyWallet, new PublicKey(marketData.baseMint));
+                            console.log(`   🏦 Predicted ATA (Base): ${baseAta.toBase58()}`);
+
+                            // 2. Tentativo Predizione Pool
+                            const predictedPool = PdaCalculator.predictRaydiumPoolAddress(raydiumProgId, pubkey);
+                            if (predictedPool) {
+                                console.log(`   🔮 Predicted Pool PDA: ${predictedPool.toBase58()} (Warning: V4 might use Keypair)`);
+                            }
+                        } catch (e) {
+                            console.log(`   ⚠️  Errore calcoli PDA: ${e}`);
+                        }
+
+                        console.log(`   ⏳ In attesa di 'Initialize2' su Raydium per confermare ID Pool...\n`);
+                    }
+                    // else { Ignora silenziosamente il rumore (EventQueue, Bids, Asks, etc.) }
                 }
 
             } catch (err) {
