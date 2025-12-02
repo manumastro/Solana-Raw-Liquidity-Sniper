@@ -25,9 +25,10 @@ Questo bot utilizza una strategia professionale a due livelli:
 | **OpenBook Listener** | ✅ | Connesso e funzionante. Rileva nuovi mercati in tempo reale. |
 | **Raydium Listener** | ✅ | Connesso e funzionante. Filtra logs per `Initialize2`. |
 | **Dual Engine** | ✅ | Entrambi i listener girano in parallelo senza blocchi. |
-| **Market Parser** | 🚧 | Decodifica dei dati OpenBook (Base/Quote Mint) in sviluppo. |
-| **PDA Predictor** | 🚧 | Calcolo deterministico dell'indirizzo pool in sviluppo. |
-| **Auto-Swap** | 🚧 | Esecuzione transazioni Jito in sviluppo. |
+| **Market Parser** | ✅ | Decodifica `baseMint` e `quoteMint` dai dati raw di OpenBook. |
+| **PDA Calculator** | ✅ | Calcola ATA. Nota: Pool ID V4 è Keypair (random), CPMM è PDA. |
+| **Safety Checks** | 🚧 | In sviluppo: verifica Mint/Freeze Authority. |
+| **Auto-Swap** | 🚧 | In sviluppo: esecuzione transazioni Jito. |
 
 ---
 
@@ -46,10 +47,10 @@ solana-raw-sniper/
 │   │   └── helius_raw.ts       # 📊 Strategia Conferma (Raydium)
 │   │
 │   ├── parsers/            # Decodifica Dati
-│   │   └── market_parser.ts    # 🚧 Parsing layout OpenBook
+│   │   └── market_parser.ts    # ✅ Parsing layout OpenBook (Offset 53/85)
 │   │
 │   └── utils/              # Tools
-│       └── pda_calculator.ts   # 🚧 Calcolo indirizzi futuri
+│       └── pda_calculator.ts   # ✅ Calcolo ATA e Market Authority
 ```
 
 ---
@@ -86,13 +87,15 @@ chmod +x start.sh
 ## 🧠 Deep Dive Tecnico
 
 ### Perché OpenBook?
-OpenBook (fork di Serum V3) è l'orderbook sottostante usato da Raydium.
-L'indirizzo di una pool Raydium AMM V4 non è casuale, ma è un **Program Derived Address (PDA)** derivato da:
-1.  Raydium Program ID
-2.  OpenBook Market ID
-3.  Altri seed costanti
+OpenBook (fork di Serum V3) è l'orderbook sottostante usato da Raydium Legacy.
+L'indirizzo di una pool Raydium AMM V4 è solitamente una **Keypair casuale**, quindi non predicibile al 100%.
+**TUTTAVIA**, usando OpenBook possiamo:
+1.  Rilevare il mercato minuti prima della pool.
+2.  Estrarre i Token Mint (`baseMint`, `quoteMint`).
+3.  Pre-calcolare gli **Associated Token Accounts (ATA)** del nostro wallet.
+4.  Preparare tutto per lo swap e attendere solo l'evento `Initialize2` di Raydium per scattare.
 
-**Il vantaggio:** Appena vediamo un Market ID su OpenBook, abbiamo tutti gli ingredienti per calcolare dove sarà la pool e "appostarci" lì con uno sniper (o pre-calcolare le transazioni).
+*Nota: Per il nuovo standard Raydium CPMM, l'indirizzo pool è un PDA deterministico e può essere predetto.*
 
 ### Program IDs Monitorati
 *   **Raydium V4:** `675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8`
@@ -106,14 +109,13 @@ L'indirizzo di una pool Raydium AMM V4 non è casuale, ma è un **Program Derive
 *   [x] Setup WebSocket multipli
 *   [x] Bypass limitazioni RPC Free Tier
 *   [x] Rilevamento eventi base
+*   [x] **Market Parser:** Estrazione Token Mint da OpenBook
+*   [x] **PDA Calculator:** Calcolo ATA e predisposizione CPMM
 
-### Fase 2: Data Extraction (In Corso 🚧)
-*   [ ] **Market Layout Parsing:** Leggere i 388 bytes del market OpenBook per estrarre `CoinMint` (Token) e `PcMint` (SOL/USDC).
-*   [ ] **PDA Calculation:** Implementare la funzione di derivazione indirizzo Pool.
-
-### Fase 3: Execution (Futuro)
+### Fase 2: Safety & Execution (In Corso 🚧)
+*   [ ] **Safety Checks:** Verificare Mint Authority e Freeze Authority (Anti-Rug).
+*   [ ] **Swapper:** Creazione ed invio transazione di acquisto.
 *   [ ] **Jito Integration:** Inviare bundle per garantire l'inclusione nel blocco.
-*   [ ] **Safety Checks:** Verifica automatica Mint Authority revocata.
 
 ---
 

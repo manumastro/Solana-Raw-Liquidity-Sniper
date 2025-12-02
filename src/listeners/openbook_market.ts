@@ -114,10 +114,12 @@ export async function startOpenBookListener() {
                             const baseAta = PdaCalculator.getAssociatedTokenAccount(dummyWallet, new PublicKey(marketData.baseMint));
                             console.log(`   🏦 Predicted ATA (Base): ${baseAta.toBase58()}`);
 
-                            // 2. Tentativo Predizione Pool
+                            // 2. Tentativo Predizione Pool (Solo per scopi futuri/CPMM)
+                            // NOTA: Per Raydium V4 Legacy (il nostro target attuale), l'indirizzo pool è random (Keypair).
+                            // Questa funzione sarà utile se integreremo il supporto a Raydium CPMM o CLMM.
                             const predictedPool = PdaCalculator.predictRaydiumPoolAddress(raydiumProgId, pubkey);
                             if (predictedPool) {
-                                console.log(`   🔮 Predicted Pool PDA: ${predictedPool.toBase58()} (Warning: V4 might use Keypair)`);
+                                console.log(`   🔮 Predicted Pool PDA: ${predictedPool.toBase58()} (Nota: Probabilmente errato per V4, valido per CPMM)`);
                             }
                         } catch (e) {
                             console.log(`   ⚠️  Errore calcoli PDA: ${e}`);

@@ -65,7 +65,7 @@ export class PdaCalculator {
     /**
      * Tenta di calcolare l'indirizzo della pool Raydium (AMM ID).
      * ⚠️ ATTENZIONE: Per Raydium V4 Legacy questo spesso NON funziona perché è una Keypair.
-     * Funziona invece per Raydium CPMM (New).
+     * Funziona invece per Raydium CPMM (New Standard) dove l'indirizzo è un PDA deterministico.
      */
     static predictRaydiumPoolAddress(
         programId: PublicKey,
