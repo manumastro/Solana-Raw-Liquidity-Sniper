@@ -1,0 +1,29 @@
+{
+    "name": "solana-raw-sniper",
+    "version": "1.0.0",
+    "description": "Solana Raw Liquidity Sniper Bot",
+    "main": "dist/index.js",
+    "scripts": {
+        "start": "ts-node src/index.ts",
+        "build": "tsc"
+    },
+    "keywords": [
+        "solana",
+        "sniper",
+        "mev",
+        "raydium"
+    ],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "dotenv": "^16.4.5",
+        "@solana/web3.js": "^1.91.0",
+        "ws": "^8.16.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.3.3",
+        "ts-node": "^10.9.2",
+        "@types/node": "^20.11.24",
+        "@types/ws": "^8.5.10"
+    }
+}
