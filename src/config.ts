@@ -22,7 +22,7 @@ export const CONFIG = {
 
     // Costanti Raydium & Solana
     RAYDIUM_PROGRAM_ID: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', // Raydium V4 AMM (Legacy)
-    OPENBOOK_PROGRAM_ID: 'opnb2LAfJYbRMAHHvqjCwQxanZn7ReEHp1k81EohpZb', // OpenBook v1 (ex-Serum fork)
+    OPENBOOK_PROGRAM_ID: 'srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX', // OpenBook v1 (Serum V3 Fork) - Usato da Raydium V4
     POOL_SIZE_BYTES: 752, // Dimensione fissa struct AMM V4
     SOL_MINT: 'So11111111111111111111111111111111111111112',
 
