@@ -2,8 +2,7 @@
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import { CONFIG } from '../config';
 import { parseMarketData } from '../parsers/market_parser';
-import { PdaCalculator } from '../utils/pda_calculator';
-import { SniperManager } from '../core/sniper_manager';
+import { MarketCache } from '../core/market_cache';
 
 /**
  * 🧠 OPENBOOK STRATEGY - La strategia avanzata degli sniper professionisti
@@ -27,7 +26,7 @@ export async function startOpenBookListener() {
 
     const openbookPubkey = new PublicKey(CONFIG.OPENBOOK_PROGRAM_ID);
 
-    console.log(`   --> Strategia: ANTICIPAZIONE (OpenBook → Raydium)`);
+    console.log(`   --> Strategia: CACHING (OpenBook → Memory)`);
     console.log(`   --> Target: OpenBook Markets (${CONFIG.OPENBOOK_PROGRAM_ID})`);
 
     try {
@@ -57,48 +56,24 @@ export async function startOpenBookListener() {
                     let isInverted = false;
 
                     if (baseMint === SOL_MINT) {
-                        console.log("   🔄 Coppia invertita rilevata (SOL è Base). Scambio Base/Quote...");
+                        // console.log("   🔄 Coppia invertita rilevata (SOL è Base). Scambio Base/Quote...");
                         baseMint = marketData.quoteMint;
                         quoteMint = marketData.baseMint;
                         isInverted = true;
                     }
 
-                    console.log(`\n🔥 NUOVO MERCATO OPENBOOK RILEVATO!`);
-                    console.log(`   📍 Market Address: ${pubkey.toBase58()}`);
-                    console.log(`   🎰 Slot: ${slot}`);
-                    console.log(`   ⏱️  Tempo: ${new Date().toISOString()}`);
-                    console.log(`   💎 Base Mint (Token): ${baseMint}`);
-                    console.log(`   💰 Quote Mint (SOL/USDC): ${quoteMint}`);
-                    console.log(`   🔗 Solscan: https://solscan.io/account/${pubkey.toBase58()}`);
-
-                    // Tentativo di predizione
-                    // Usiamo un wallet random per simulare il calcolo dell'ATA (in produzione useremmo il tuo wallet)
-                    const dummyWallet = Keypair.generate().publicKey;
-
-                    try {
-                        const raydiumProgId = new PublicKey(CONFIG.RAYDIUM_PROGRAM_ID);
-                        const baseAta = PdaCalculator.getAssociatedTokenAccount(dummyWallet, new PublicKey(baseMint));
-                        console.log(`   🏦 Predicted ATA (Base): ${baseAta.toBase58()} (Simulated)`);
-
-                        // AGGIUNTA ALLA WATCHLIST
-                        SniperManager.getInstance().addToWatchlist({
-                            marketId: pubkey.toBase58(),
-                            baseMint: baseMint,
-                            quoteMint: quoteMint,
-                            baseAta: baseAta.toBase58(),
-                            timestamp: Date.now(),
-                            inverted: isInverted
-                        });
-
-                        const predictedPool = PdaCalculator.predictRaydiumPoolAddress(raydiumProgId, pubkey);
-                        if (predictedPool) {
-                            console.log(`   🔮 Predicted Pool PDA: ${predictedPool.toBase58()} (Potential Match)`);
-                        }
-                    } catch (e) {
-                        console.log(`   ⚠️  Errore calcoli PDA: ${e}`);
-                    }
-
-                    console.log(`   ⏳ In attesa di 'Initialize2' su Raydium per confermare ID Pool...\n`);
+                    // SALVATAGGIO IN CACHE
+                    // Invece di attivare logiche complesse, salviamo solo i dati in memoria
+                    // Così quando Raydium aprirà la pool, avremo già i dati pronti.
+                    MarketCache.getInstance().saveMarket({
+                        marketId: pubkey.toBase58(),
+                        baseMint: baseMint,
+                        quoteMint: quoteMint,
+                        bids: marketData.bids,
+                        asks: marketData.asks,
+                        eventQueue: marketData.eventQueue,
+                        timestamp: Date.now()
+                    });
                 }
             },
             {
@@ -111,7 +86,7 @@ export async function startOpenBookListener() {
         );
 
         console.log(`✅ OpenBook Subscription attiva (ID: ${subscriptionId})`);
-        console.log(`🎯 In ascolto per nuovi mercati OpenBook...\n`);
+        console.log(`🎯 In ascolto per nuovi mercati OpenBook (Caching Mode)...\n`);
 
     } catch (err) {
         console.error("❌ Errore setup OpenBook Listener:", err);

@@ -1,6 +1,6 @@
 // src/index.ts
-import { startRawListener } from './listeners/helius_raw';
 import { startOpenBookListener } from './listeners/openbook_market';
+import { startRaydiumListener } from './listeners/raydium_amm';
 import { CONFIG } from './config';
 
 async function main() {
@@ -21,6 +21,7 @@ async function main() {
         // Avvio Listener OpenBook
         // Quando trova un market, il SniperManager avvierà automaticamente il polling su Raydium
         await startOpenBookListener();
+        await startRaydiumListener();
         
         // startRawListener() rimosso per evitare limiti RPC e rumore inutile
         // await startRawListener(); 

@@ -15,19 +15,25 @@ import { PublicKey } from '@solana/web3.js';
 
 const MARKET_STATE_LAYOUT_V3 = {
     BASE_MINT_OFFSET: 53,
-    QUOTE_MINT_OFFSET: 85
+    QUOTE_MINT_OFFSET: 85,
+    BIDS_OFFSET: 285,
+    ASKS_OFFSET: 317,
+    EVENT_QUEUE_OFFSET: 349
 };
 
 export interface MarketData {
     baseMint: string;
     quoteMint: string;
+    bids: PublicKey;
+    asks: PublicKey;
+    eventQueue: PublicKey;
 }
 
 export function parseMarketData(data: Buffer): MarketData | null {
     try {
         // Verifica minima lunghezza buffer
-        // Il layout completo è ~388 bytes, ma ci servono almeno fino al quote mint (85 + 32 = 117 bytes)
-        if (data.length < 117) {
+        // Il layout completo è ~388 bytes
+        if (data.length < 388) {
             console.warn(`⚠️ Buffer troppo corto per Market Parser: ${data.length} bytes`);
             return null;
         }
@@ -46,9 +52,33 @@ export function parseMarketData(data: Buffer): MarketData | null {
         );
         const quoteMint = new PublicKey(quoteMintBuffer).toBase58();
 
+        // Estrazione Bids
+        const bidsBuffer = data.subarray(
+            MARKET_STATE_LAYOUT_V3.BIDS_OFFSET,
+            MARKET_STATE_LAYOUT_V3.BIDS_OFFSET + 32
+        );
+        const bids = new PublicKey(bidsBuffer);
+
+        // Estrazione Asks
+        const asksBuffer = data.subarray(
+            MARKET_STATE_LAYOUT_V3.ASKS_OFFSET,
+            MARKET_STATE_LAYOUT_V3.ASKS_OFFSET + 32
+        );
+        const asks = new PublicKey(asksBuffer);
+
+        // Estrazione Event Queue
+        const eventQueueBuffer = data.subarray(
+            MARKET_STATE_LAYOUT_V3.EVENT_QUEUE_OFFSET,
+            MARKET_STATE_LAYOUT_V3.EVENT_QUEUE_OFFSET + 32
+        );
+        const eventQueue = new PublicKey(eventQueueBuffer);
+
         return {
             baseMint,
-            quoteMint
+            quoteMint,
+            bids,
+            asks,
+            eventQueue
         };
 
     } catch (error) {

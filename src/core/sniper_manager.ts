@@ -1,5 +1,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { CONFIG } from '../config';
+import { parsePoolData } from '../parsers/pool_parser';
+import { PaperTrader } from './paper_trader';
 
 export interface MarketTarget {
     marketId: string;
@@ -19,6 +21,7 @@ export class SniperManager {
     private watchlist: Map<string, MarketTarget> = new Map();
     private connection: Connection;
     private activeSubscriptions: Map<string, number> = new Map(); // Map<MarketID, SubscriptionID>
+    private isLocked: boolean = false;
 
     private constructor() { 
         this.connection = new Connection(CONFIG.HELIUS_HTTPS, 'confirmed');
@@ -36,6 +39,7 @@ export class SniperManager {
      * E avvia la sottoscrizione WebSocket mirata per la pool Raydium.
      */
     public addToWatchlist(target: MarketTarget) {
+        if (this.isLocked) return;
         if (this.watchlist.has(target.marketId)) return;
 
         this.watchlist.set(target.marketId, target);
@@ -58,23 +62,28 @@ export class SniperManager {
             // Helius filtrerà lato server e ci manderà SOLO l'evento di creazione della pool giusta.
             const subscriptionId = this.connection.onProgramAccountChange(
                 new PublicKey(CONFIG.RAYDIUM_PROGRAM_ID),
-                (updatedAccountInfo, context) => {
+                async (updatedAccountInfo, context) => {
                     const poolAddress = updatedAccountInfo.accountId.toBase58();
                     console.log(`\n   🚨 🚨 🚨 POOL TROVATA (WebSocket)! 🚨 🚨 🚨`);
                     console.log(`   💎 Token: ${target.baseMint}`);
                     console.log(`   🏊 Pool Address: ${poolAddress}`);
+                    console.log(`   🔗 DexScreener: https://dexscreener.com/solana/${target.baseMint}`);
                     console.log(`   🎰 Slot: ${context.slot}`);
-                    console.log(`   🚀 ESECUZIONE SNIPE (Simulata)...`);
                     
-                    // Stop listener e pulizia
-                    this.stopTargetedListener(target.marketId);
-                    this.removeTarget(target.marketId);
+                    // LOCKDOWN: Blocca tutto il resto per concentrarsi su questo target
+                    this.activateLockdown();
                     
-                    console.log(`   ✅ Snipe completato. Bot in attesa di nuovi target.`);
-
-                    // fermo qui - l'esecuzione per test
-                    process.exit(0);
-        
+                    // Parsing Pool Data per Paper Trading
+                    const poolData = parsePoolData(updatedAccountInfo.accountInfo.data);
+                    
+                    if (poolData) {
+                        // Avvio Paper Trader
+                        const trader = new PaperTrader();
+                        // Non usiamo await qui per non bloccare il callback, anche se in questo caso è l'ultima azione
+                        trader.startTracking(poolData, target.inverted || false).catch(e => console.error(e));
+                    } else {
+                        console.error("   ❌ Impossibile parsare i dati della pool per il Paper Trading.");
+                    }
                 },
                 'confirmed',
                 [
@@ -84,16 +93,6 @@ export class SniperManager {
             );
 
             this.activeSubscriptions.set(target.marketId, subscriptionId);
-
-            // Timeout di sicurezza: smetti di ascoltare dopo 10 minuti se non succede nulla
-            setTimeout(() => {
-                if (this.activeSubscriptions.has(target.marketId)) {
-                    console.log(`   ⏰ Timeout listener per ${target.marketId}. Rimozione.`);
-                    this.stopTargetedListener(target.marketId);
-                    this.removeTarget(target.marketId);
-                }
-            }, 10 * 60 * 1000);
-
         } catch (error) {
             console.error(`   ⚠️ Errore avvio listener ${target.marketId}:`, error);
         }
@@ -132,5 +131,29 @@ export class SniperManager {
      */
     public getWatchlist(): MarketTarget[] {
         return Array.from(this.watchlist.values());
+    }
+
+    /**
+     * Attiva il Lockdown: ferma tutti i listener e impedisce nuove aggiunte.
+     * Usato quando viene trovato un target valido per concentrare le risorse.
+     */
+    private activateLockdown() {
+        if (this.isLocked) return;
+        this.isLocked = true;
+        console.log("   🔒 LOCKDOWN ATTIVO: Stop ricerca altri target.");
+        
+        // Rimuovi tutte le sottoscrizioni attive
+        this.activeSubscriptions.forEach((subId) => {
+            this.connection.removeProgramAccountChangeListener(subId).catch(e => console.error(e));
+        });
+        this.activeSubscriptions.clear();
+        this.watchlist.clear();
+    }
+
+    /**
+     * Restituisce lo stato del Lockdown
+     */
+    public isLockdownActive(): boolean {
+        return this.isLocked;
     }
 }
